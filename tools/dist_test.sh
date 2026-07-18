@@ -1,10 +1,18 @@
 #!/usr/bin/env bash
 
-CONFIG=$1
-CHECKPOINT=$2
-GPUS=$3
+# hardcoded config
+CONFIG=projects/configs/sparsedrive_small_stage2.py
+CHECKPOINT=/workspace/ckpt/sparsedrive_stage2.pth
+GPUS=2
 PORT=${PORT:-29610}
+CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-0,1}
+
+# conda env
+source /root/anaconda3/etc/profile.d/conda.sh
+conda activate sparsedrive
+
+export CUDA_VISIBLE_DEVICES
 
 PYTHONPATH="$(dirname $0)/..":$PYTHONPATH \
 python3 -m torch.distributed.launch --nproc_per_node=$GPUS --master_port=$PORT \
-    $(dirname "$0")/test.py $CONFIG $CHECKPOINT --launcher pytorch ${@:4}
+    $(dirname "$0")/test.py $CONFIG $CHECKPOINT --launcher pytorch --eval bbox "${@:1}"

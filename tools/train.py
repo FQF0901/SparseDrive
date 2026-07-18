@@ -10,6 +10,38 @@ import copy
 import mmcv
 import time
 import torch
+# PyTorch 2.6+ changed torch.load weights_only default to True,
+# but mmcv 1.x doesn't pass it — override default for legacy .pth files.
+_orig_torch_load = torch.load
+def _patched_torch_load(*a, **kw):
+    kw.setdefault('weights_only', False)
+    return _orig_torch_load(*a, **kw)
+torch.load = _patched_torch_load
+# PyTorch 2.6+ changed _get_stream to require torch.device not int
+# mmcv passes int device_ids through Scatter.forward -> _get_stream
+from torch.nn.parallel._functions import _get_stream as _orig_get_stream
+def _patched_get_stream(device):
+    if isinstance(device, int):
+        device = torch.device(f'cuda:{device}')
+    return _orig_get_stream(device)
+import torch.nn.parallel._functions as _torch_parallel_fns
+_torch_parallel_fns._get_stream = _patched_get_stream
+# PyTorch 2.6+ removed DDP._use_replicated_tensor_module attribute
+# that mmcv MMDistributedDataParallel._run_ddp_forward relies on.
+from mmcv.parallel import MMDistributedDataParallel
+_orig_ddp_forward = MMDistributedDataParallel._run_ddp_forward
+def _patched_ddp_forward(self, *inputs, **kwargs):
+    if hasattr(self, '_use_replicated_tensor_module'):
+        module_to_run = self._replicated_tensor_module if \
+            self._use_replicated_tensor_module else self.module
+    else:
+        module_to_run = self.module
+    if self.device_ids:
+        inputs, kwargs = self.to_kwargs(inputs, kwargs, self.device_ids[0])
+        return module_to_run(*inputs[0], **kwargs[0])
+    else:
+        return module_to_run(*inputs, **kwargs)
+MMDistributedDataParallel._run_ddp_forward = _patched_ddp_forward
 import warnings
 from mmcv import Config, DictAction
 from mmcv.runner import get_dist_info, init_dist
@@ -30,6 +62,10 @@ cv2.setNumThreads(8)
 
 
 def parse_args():
+    # torchrun passes --local-rank (hyphen) but argparse expects --local_rank (underscore)
+    for i, arg in enumerate(sys.argv):
+        if arg.startswith("--local-rank"):
+            sys.argv[i] = "--local_rank" + arg[len("--local-rank"):]
     parser = argparse.ArgumentParser(description="Train a detector")
     parser.add_argument("config", help="train config file path")
     parser.add_argument("--work-dir", help="the dir to save logs and models")

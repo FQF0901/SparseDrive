@@ -9,8 +9,8 @@ dist_params = dict(backend="nccl")
 log_level = "INFO"
 work_dir = None
 
-total_batch_size = 48
-num_gpus = 8
+total_batch_size = 12
+num_gpus = 2
 batch_size = total_batch_size // num_gpus
 num_iters_per_epoch = int(length[version] // (num_gpus * batch_size))
 num_epochs = 10
@@ -99,7 +99,7 @@ model = dict(
         with_cp=True,
         out_indices=(0, 1, 2, 3),
         norm_cfg=dict(type="BN", requires_grad=True),
-        pretrained="ckpt/resnet50-19c8e357.pth",
+        pretrained="/workspace/ckpt/resnet50-19c8e357.pth",
     ),
     img_neck=dict(
         type="FPN",
@@ -127,7 +127,7 @@ model = dict(
                 type="InstanceBank",
                 num_anchor=900,
                 embed_dims=embed_dims,
-                anchor="data/kmeans/kmeans_det_900.npy",
+                anchor="/workspace/data/kmeans/kmeans_det_900.npy",
                 anchor_handler=dict(type="SparseBox3DKeyPointsGenerator"),
                 num_temp_instances=600 if temporal else -1,
                 confidence_decay=0.6,
@@ -272,7 +272,7 @@ model = dict(
                 type="InstanceBank",
                 num_anchor=100,
                 embed_dims=embed_dims,
-                anchor="data/kmeans/kmeans_map_100.npy",
+                anchor="/workspace/data/kmeans/kmeans_map_100.npy",
                 anchor_handler=dict(type="SparsePoint3DKeyPointsGenerator"),
                 num_temp_instances=33 if temporal_map else -1,
                 confidence_decay=0.6,
@@ -402,8 +402,8 @@ model = dict(
             fut_mode=fut_mode,
             ego_fut_ts=ego_fut_ts,
             ego_fut_mode=ego_fut_mode,
-            motion_anchor=f'data/kmeans/kmeans_motion_{fut_mode}.npy',
-            plan_anchor=f'data/kmeans/kmeans_plan_{ego_fut_mode}.npy',
+            motion_anchor=f'/workspace/data/kmeans/kmeans_motion_{fut_mode}.npy',
+            plan_anchor=f'/workspace/data/kmeans/kmeans_plan_{ego_fut_mode}.npy',
             embed_dims=embed_dims,
             decouple_attn=decouple_attn_motion,
             instance_queue=dict(
@@ -507,8 +507,8 @@ model = dict(
 
 # ================== data ========================
 dataset_type = "NuScenes3DDataset"
-data_root = "data/nuscenes/"
-anno_root = "data/infos/" if version == 'trainval' else "data/infos/mini/"
+data_root = "/home/algo_zf/Data/nuscenes/"
+anno_root = "/workspace/data/infos/" if version == 'trainval' else "/workspace/data/infos/mini/"
 file_client_args = dict(backend="disk")
 
 img_norm_cfg = dict(
@@ -718,4 +718,4 @@ evaluation = dict(
     eval_mode=eval_mode,
 )
 # ================== pretrained model ========================
-load_from = 'ckpt/sparsedrive_stage1.pth'
+load_from = '/workspace/ckpt/sparsedrive_stage1.pth'
