@@ -295,12 +295,27 @@ class NuScenes3DDataset(Dataset):
                 map_geoms[label].append(geom)
         return map_geoms
     
+    def _resolve_data_path(self, path):
+        """Resolve dataset file paths from annotation, handling stale prefixes.
+
+        The annotation pkl may contain paths like:
+          'data/nuscenes/samples/...'          (relative, old convention)
+          '/workspace/SparseDrive/data/nuscenes/...'  (absolute, old env)
+        Rebase them onto self.data_root so the config can point anywhere.
+        """
+        idx = path.find("data/nuscenes/")
+        if idx != -1:
+            path = path[idx + len("data/nuscenes/"):]
+        if not os.path.isabs(path):
+            path = os.path.join(self.data_root, path)
+        return path
+
     def get_data_info(self, index):
         info = self.data_infos[index]
         input_dict = dict(
             token=info["token"],
             map_location=info["map_location"],
-            pts_filename=info["lidar_path"],
+            pts_filename=self._resolve_data_path(info["lidar_path"]),
             sweeps=info["sweeps"],
             timestamp=info["timestamp"] / 1e6,
             lidar2ego_translation=info["lidar2ego_translation"],
@@ -331,7 +346,7 @@ class NuScenes3DDataset(Dataset):
             lidar2cam_rts = []
             cam_intrinsic = []
             for cam_type, cam_info in info["cams"].items():
-                image_paths.append(cam_info["data_path"])
+                image_paths.append(self._resolve_data_path(cam_info["data_path"]))
                 # obtain lidar to image transformation matrix
                 lidar2cam_r = np.linalg.inv(cam_info["sensor2lidar_rotation"])
                 lidar2cam_t = (
